@@ -1,0 +1,412 @@
+-- Enable Secure Mode to reduce detection
+getgenv().SecureMode = true
+
+-- Load Rayfield library
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+if not Rayfield then
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "Hecker Aim V2",
+        Text = "Failed to load Rayfield library! Check executor or internet.",
+        Duration = 5
+    })
+    return
+end
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+local HttpService = game:GetService("HttpService")
+local Workspace = game:GetService("Workspace")
+local Camera = Workspace.CurrentCamera
+
+local LocalPlayer = Players.LocalPlayer
+local ConfigFile = "hecker_aim_config_v2.json"
+
+-- Default configuration
+local Config = {
+    Enabled = false,
+    AssistStrength = 0.15,
+    MaxDistance = 500,
+    LockPart = "Head",
+    TeamCheck = true,
+    WallCheck = false,
+    FOVEnabled = true,
+    FOVRadius = 150,
+    FOVVisible = true,
+    FOVColor = Color3.fromRGB(0, 255, 255),
+    FOVThickness = 1,
+    Smoothing = 0.5,
+    PriorityTarget = "Closest",
+    AimKey = "MouseButton2" -- Store as string for dropdown
+}
+
+-- Load saved config
+local function LoadConfig()
+    if isfile and readfile then
+        if isfile(ConfigFile) then
+            local success, savedConfig = pcall(function()
+                return HttpService:JSONDecode(readfile(ConfigFile))
+            end)
+            if success and savedConfig then
+                for key, value in pairs(savedConfig) do
+                    if key == "FOVColor" then
+                        Config[key] = Color3.fromRGB(value.R, value.G, value.B)
+                    else
+                        Config[key] = value
+                    end
+                end
+            end
+        end
+    end
+end
+LoadConfig()
+
+-- Save config
+local function SaveConfig()
+    if writefile then
+        local saveData = {}
+        for key, value in pairs(Config) do
+            if key == "FOVColor" then
+                saveData[key] = {R = value.R * 255, G = value.G * 255, B = value.B * 255}
+            else
+                saveData[key] = value
+            end
+        end
+        local success, err = pcall(function()
+            writefile(ConfigFile, HttpService:JSONEncode(saveData))
+        end)
+        if success then
+            Rayfield:Notify({
+                Title = "Hecker Aim V2",
+                Content = "Config saved successfully!",
+                Duration = 2
+            })
+        else
+            Rayfield:Notify({
+                Title = "Hecker Aim V2",
+                Content = "Config save failed. Check executor permissions.",
+                Duration = 2
+            })
+        end
+    else
+        Rayfield:Notify({
+            Title = "Hecker Aim V2",
+            Content = "Executor does not support file operations.",
+            Duration = 2
+        })
+    end
+end
+
+-- Rayfield GUI setup
+local Window = Rayfield:CreateWindow({
+    Name = "Hecker Aim Assist V2",
+    LoadingTitle = "Hecker Aim Assist",
+    LoadingSubtitle = "by hecker",
+    ConfigurationSaving = {
+        Enabled = false, -- Manual saving via script
+        FileName = "hecker_aim_v2"
+    },
+    Discord = {
+        Enabled = false
+    },
+    KeySystem = false,
+    ToggleUIKeybind = "RightShift"
+})
+
+local MainTab = Window:CreateTab("Main", nil)
+local ConfigTab = Window:CreateTab("Config", nil)
+local VisualsTab = Window:CreateTab("Visuals", nil)
+
+-- Main tab controls
+MainTab:CreateToggle({
+    Name = "Enable Aim Assist",
+    CurrentValue = Config.Enabled,
+    Flag = "EnableAim",
+    Callback = function(Value)
+        Config.Enabled = Value
+        Rayfield:Notify({
+            Title = "Hecker Aim V2",
+            Content = "Aim Assist " .. (Value and "Enabled" or "Disabled"),
+            Duration = 3
+        })
+    end
+})
+
+MainTab:CreateToggle({
+    Name = "Team Check",
+    CurrentValue = Config.TeamCheck,
+    Flag = "TeamCheck",
+    Callback = function(Value)
+        Config.TeamCheck = Value
+        SaveConfig()
+    end
+})
+
+MainTab:CreateToggle({
+    Name = "Wall Check",
+    CurrentValue = Config.WallCheck,
+    Flag = "WallCheck",
+    Callback = function(Value)
+        Config.WallCheck = Value
+        SaveConfig()
+    end
+})
+
+MainTab:CreateDropdown({
+    Name = "Aim Key",
+    Options = {"MouseButton2", "MouseButton1", "E", "Q"},
+    CurrentOption = Config.AimKey,
+    Flag = "AimKey",
+    Callback = function(Value)
+        Config.AimKey = Value
+        SaveConfig()
+    end
+})
+
+-- Config tab controls
+ConfigTab:CreateSlider({
+    Name = "Assist Strength",
+    Range = {0, 1},
+    Increment = 0.01,
+    Suffix = "",
+    CurrentValue = Config.AssistStrength,
+    Flag = "AssistStrength",
+    Callback = function(Value)
+        Config.AssistStrength = Value
+        SaveConfig()
+    end
+})
+
+ConfigTab:CreateSlider({
+    Name = "Max Distance",
+    Range = {50, 1000},
+    Increment = 10,
+    Suffix = " studs",
+    CurrentValue = Config.MaxDistance,
+    Flag = "MaxDistance",
+    Callback = function(Value)
+        Config.MaxDistance = Value
+        SaveConfig()
+    end
+})
+
+ConfigTab:CreateSlider({
+    Name = "Smoothing",
+    Range = {0.1, 1},
+    Increment = 0.01,
+    Suffix = "",
+    CurrentValue = Config.Smoothing,
+    Flag = "Smoothing",
+    Callback = function(Value)
+        Config.Smoothing = Value
+        SaveConfig()
+    end
+})
+
+ConfigTab:CreateInput({
+    Name = "Lock Part",
+    PlaceholderText = "Head",
+    RemoveTextAfterFocusLost = false,
+    Flag = "LockPart",
+    Callback = function(Value)
+        if Value and #Value > 0 then
+            Config.LockPart = Value
+            SaveConfig()
+        end
+    end
+})
+
+ConfigTab:CreateDropdown({
+    Name = "Priority Target",
+    Options = {"Closest", "Lowest Health", "Furthest"},
+    CurrentOption = Config.PriorityTarget,
+    Flag = "PriorityTarget",
+    Callback = function(Value)
+        Config.PriorityTarget = Value
+        SaveConfig()
+    end
+})
+
+ConfigTab:CreateButton({
+    Name = "Save Config",
+    Callback = SaveConfig
+})
+
+-- Visuals tab controls
+VisualsTab:CreateToggle({
+    Name = "FOV Enabled",
+    CurrentValue = Config.FOVEnabled,
+    Flag = "FOVEnabled",
+    Callback = function(Value)
+        Config.FOVEnabled = Value
+        SaveConfig()
+    end
+})
+
+VisualsTab:CreateToggle({
+    Name = "FOV Visible",
+    CurrentValue = Config.FOVVisible,
+    Flag = "FOVVisible",
+    Callback = function(Value)
+        Config.FOVVisible = Value
+        SaveConfig()
+    end
+})
+
+VisualsTab:CreateSlider({
+    Name = "FOV Radius",
+    Range = {50, 500},
+    Increment = 5,
+    Suffix = " px",
+    CurrentValue = Config.FOVRadius,
+    Flag = "FOVRadius",
+    Callback = function(Value)
+        Config.FOVRadius = Value
+        SaveConfig()
+    end
+})
+
+VisualsTab:CreateSlider({
+    Name = "FOV Thickness",
+    Range = {1, 10},
+    Increment = 1,
+    Suffix = " px",
+    CurrentValue = Config.FOVThickness,
+    Flag = "FOVThickness",
+    Callback = function(Value)
+        Config.FOVThickness = Value
+        SaveConfig()
+    end
+})
+
+VisualsTab:CreateColorPicker({
+    Name = "FOV Color",
+    Color = Config.FOVColor,
+    Flag = "FOVColor",
+    Callback = function(Value)
+        Config.FOVColor = Value
+        SaveConfig()
+    end
+})
+
+-- FOV Circle
+local fovCircle = Drawing.new("Circle")
+fovCircle.Visible = false
+fovCircle.Radius = Config.FOVRadius
+fovCircle.Color = Config.FOVColor
+fovCircle.Thickness = Config.FOVThickness
+fovCircle.Transparency = 1
+fovCircle.Filled = false
+
+-- IsValidTarget function
+local function IsValidTarget(player, targetModel)
+    if not Config.TeamCheck then return true end
+    local targetPlayer = Players:GetPlayerFromCharacter(targetModel)
+    if not targetPlayer then return false end
+    if not LocalPlayer.Team and not targetPlayer.Team then return false end
+    return LocalPlayer.Team ~= targetPlayer.Team
+end
+
+-- Wall check function
+local function CanSeeTarget(targetModel, targetPos)
+    if not Config.WallCheck then return true end
+    local ray = Ray.new(Camera.CFrame.Position, (targetPos - Camera.CFrame.Position).Unit * Config.MaxDistance)
+    local hit = Workspace:FindPartOnRayWithIgnoreList(ray, {LocalPlayer.Character or {}})
+    return hit == nil or hit:IsDescendantOf(targetModel)
+end
+
+-- GetClosestHumanoid with priority
+local function GetClosestHumanoid()
+    local closest = nil
+    local minScreenDist = Config.FOVEnabled and Config.FOVRadius or math.huge
+    local minHealth = math.huge
+    local maxDistance = 0
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    for _, model in ipairs(Workspace:GetChildren()) do
+        if model:IsA("Model") and model ~= LocalPlayer.Character then
+            local humanoid = model:FindFirstChild("Humanoid")
+            local root = model:FindFirstChild("HumanoidRootPart")
+            local part = model:FindFirstChild(Config.LockPart)
+            if humanoid and root and part and humanoid.Health > 0 then
+                if IsValidTarget(LocalPlayer, model) and CanSeeTarget(model, part.Position) then
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+                    if onScreen then
+                        local dist3D = (part.Position - Camera.CFrame.Position).Magnitude
+                        if dist3D < Config.MaxDistance then
+                            local screenDist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                            if Config.PriorityTarget == "Closest" and screenDist < minScreenDist then
+                                minScreenDist = screenDist
+                                closest = model
+                            elseif Config.PriorityTarget == "Lowest Health" and humanoid.Health < minHealth then
+                                minHealth = humanoid.Health
+                                closest = model
+                            elseif Config.PriorityTarget == "Furthest" and dist3D > maxDistance then
+                                maxDistance = dist3D
+                                closest = model
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- Aim lock
+local lockedTarget = nil
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    local inputKey = Config.AimKey
+    local isKeyPressed = (input.UserInputType.Name == inputKey) or (input.KeyCode.Name == inputKey)
+    if isKeyPressed and Config.Enabled then
+        lockedTarget = GetClosestHumanoid()
+        if lockedTarget then
+            Rayfield:Notify({
+                Title = "Hecker Aim V2",
+                Content = "Locked on: " .. lockedTarget.Name,
+                Duration = 2
+            })
+        end
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    local inputKey = Config.AimKey
+    local isKeyReleased = (input.UserInputType.Name == inputKey) or (input.KeyCode.Name == inputKey)
+    if isKeyReleased then
+        lockedTarget = nil
+    end
+end)
+
+-- Camera and FOV update
+RunService.RenderStepped:Connect(function(deltaTime)
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    fovCircle.Position = center
+    fovCircle.Radius = Config.FOVRadius
+    fovCircle.Color = Config.FOVColor
+    fovCircle.Thickness = Config.FOVThickness
+    fovCircle.Visible = Config.Enabled and Config.FOVVisible
+
+    if Config.Enabled and lockedTarget and lockedTarget:FindFirstChild(Config.LockPart) then
+        local targetPos = lockedTarget[Config.LockPart].Position
+        local currentCFrame = Camera.CFrame
+        local targetCFrame = CFrame.new(currentCFrame.Position, targetPos)
+        local lerpAmount = Config.AssistStrength * (1 - Config.Smoothing * deltaTime)
+        Camera.CFrame = currentCFrame:Lerp(targetCFrame, math.clamp(lerpAmount, 0, 1))
+    end
+end)
+
+-- Cleanup
+LocalPlayer.CharacterAdded:Connect(function()
+    lockedTarget = nil
+end)
+
+-- Notify script loaded
+Rayfield:Notify({
+    Title = "Hecker Aim V2",
+    Content = "Script loaded successfully! Press RightShift to open GUI.",
+    Duration = 3
+})
