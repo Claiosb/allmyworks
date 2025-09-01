@@ -1,8 +1,5 @@
-I just made this repo... So I can upload all of my works by the end of the year I exepect to have around 450 diffrernt files inside this singular reop that anyone can use 
+I just created this repository... to upload all of my work. By the end of the year, I expect to have around 450 different files in this single repo that anyone can use.
 
+Warning: Everything I've created is intended to be used in your own environment. Please don't use these tools to ruin the game for other players.
 
-Warnining: Everything I made is and should be used in YOUR own enviorment pls dont fuck up the game for other players.
-
-
-
-DM my discord for any ideas/collabs -coderhecker
+DM me on Discord for any ideas or collaborations: coderhecker
